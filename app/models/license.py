@@ -8,13 +8,13 @@ import os
 class License(db.Model):
     """Licencias del sistema - Versión Segura"""
 
-    __tablename__ = 'licenses'
+    __tablename__ = "licenses"
 
     id = db.Column(db.Integer, primary_key=True)
     license_key = db.Column(db.String(50), unique=True, nullable=False, index=True)
 
     # Relación con cliente
-    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id"), nullable=False)
 
     # Hardware vinculado (hasheado para privacidad)
     hardware_id_hash = db.Column(db.String(64), nullable=True)
@@ -25,9 +25,9 @@ class License(db.Model):
     fecha_expiracion = db.Column(db.DateTime, nullable=False)
 
     # Estado: activa, vencida, suspendida, por_vencer, gracia
-    estado = db.Column(db.String(20), default='activa', nullable=False)
+    estado = db.Column(db.String(20), default="activa", nullable=False)
 
-    # Control de gracia mejorado
+    # Control de gracia
     grace_used = db.Column(db.Boolean, default=False)
     grace_started_at = db.Column(db.DateTime, nullable=True)
     grace_hours_allowed = db.Column(db.Integer, default=24)
@@ -42,32 +42,36 @@ class License(db.Model):
     revoked_at = db.Column(db.DateTime, nullable=True)
     revoked_reason = db.Column(db.String(100), nullable=True)
 
-    # Firma digital (para verificar integridad)
+    # Firma digital
     signature = db.Column(db.String(128), nullable=True)
 
-    # Última validación recibida
+    # Última validación
     last_validation = db.Column(db.DateTime, nullable=True)
 
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
 
     # Relaciones
     validation_logs = db.relationship(
-        'ValidationLog',
-        backref='license',
+        "ValidationLog",
+        backref="license",
         lazy=True,
-        cascade='all, delete-orphan'
+        cascade="all, delete-orphan"
     )
     renewals = db.relationship(
-        'Renewal',
-        backref='license',
+        "Renewal",
+        backref="license",
         lazy=True,
-        cascade='all, delete-orphan'
+        cascade="all, delete-orphan"
     )
 
     def __repr__(self):
-        return f'<License {self.license_key} ({self.estado})>'
+        return f"<License {self.license_key} ({self.estado})>"
 
     @staticmethod
     def _hash_hardware(hardware_id, salt=None):
@@ -86,7 +90,7 @@ class License(db.Model):
     def verify_hardware_id(self, hardware_id):
         """Verificar si el hardware_id coincide."""
         if not self.hardware_id_hash:
-            return True  # Sin activar aún
+            return True
         hash_value, _ = self._hash_hardware(hardware_id, self.hardware_salt)
         return hmac.compare_digest(hash_value, self.hardware_id_hash)
 
@@ -119,7 +123,7 @@ class License(db.Model):
         """Verificar si la licencia está activa."""
         if self.revoked_at:
             return False
-        return self.estado == 'activa' and self.dias_restantes > 0
+        return self.estado == "activa" and self.dias_restantes > 0
 
     @property
     def esta_vencida(self):
@@ -134,15 +138,15 @@ class License(db.Model):
     def actualizar_estado(self):
         """Actualizar estado basado en fecha de expiración."""
         if self.revoked_at:
-            self.estado = 'suspendida'
+            self.estado = "suspendida"
         elif self.esta_en_periodo_gracia:
-            self.estado = 'gracia'
+            self.estado = "gracia"
         elif self.dias_restantes <= 0:
-            self.estado = 'vencida'
+            self.estado = "vencida"
         elif self.dias_restantes <= 3:
-            self.estado = 'por_vencer'
+            self.estado = "por_vencer"
         else:
-            self.estado = 'activa'
+            self.estado = "activa"
 
     def start_grace_period(self):
         """Iniciar período de gracia."""
@@ -178,36 +182,36 @@ class License(db.Model):
     def to_dict(self, include_customer=False, include_sensitive=False):
         """Serializar licencia."""
         data = {
-            'id': self.id,
-            'license_key': self.license_key,
-            'customer_id': self.customer_id,
-            'fecha_inicio': self.fecha_inicio.isoformat() if self.fecha_inicio else None,
-            'fecha_expiracion': self.fecha_expiracion.isoformat() if self.fecha_expiracion else None,
-            'estado': self.estado,
-            'dias_restantes': self.dias_restantes,
-            'grace_used': self.grace_used,
-            'grace_hours_remaining': self.grace_hours_remaining if self.esta_en_periodo_gracia else None,
-            'esta_en_periodo_gracia': self.esta_en_periodo_gracia,
-            'esta_activa': self.esta_activa,
-            'esta_vencida': self.esta_vencida,
-            'esta_por_vencer': self.esta_por_vencer,
-            'activation_count': self.activation_count,
-            'last_validation': self.last_validation.isoformat() if self.last_validation else None,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+            "id": self.id,
+            "license_key": self.license_key,
+            "customer_id": self.customer_id,
+            "fecha_inicio": self.fecha_inicio.isoformat() if self.fecha_inicio else None,
+            "fecha_expiracion": self.fecha_expiracion.isoformat() if self.fecha_expiracion else None,
+            "estado": self.estado,
+            "dias_restantes": self.dias_restantes,
+            "grace_used": self.grace_used,
+            "grace_hours_remaining": self.grace_hours_remaining if self.esta_en_periodo_gracia else None,
+            "esta_en_periodo_gracia": self.esta_en_periodo_gracia,
+            "esta_activa": self.esta_activa,
+            "esta_vencida": self.esta_vencida,
+            "esta_por_vencer": self.esta_por_vencer,
+            "activation_count": self.activation_count,
+            "last_validation": self.last_validation.isoformat() if self.last_validation else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 
         if include_sensitive:
-            data['revoked_at'] = self.revoked_at.isoformat() if self.revoked_at else None
-            data['revoked_reason'] = self.revoked_reason
-            data['offline_days_used'] = self.offline_days_used
-            data['max_offline_days'] = self.max_offline_days
-            data['hardware_id_hash'] = self.hardware_id_hash
+            data["revoked_at"] = self.revoked_at.isoformat() if self.revoked_at else None
+            data["revoked_reason"] = self.revoked_reason
+            data["offline_days_used"] = self.offline_days_used
+            data["max_offline_days"] = self.max_offline_days
+            data["hardware_id_hash"] = self.hardware_id_hash
 
         if include_customer:
-            customer = getattr(self, 'customer', None)
-            if customer and hasattr(customer, 'to_dict'):
-                data['customer'] = customer.to_dict()
+            customer = getattr(self, "customer", None)
+            if customer and hasattr(customer, "to_dict"):
+                data["customer"] = customer.to_dict()
 
         return data
 
@@ -221,7 +225,7 @@ class License(db.Model):
         ).hexdigest()
 
         return {
-            'data': data,
-            'signature': signature,
-            'timestamp': datetime.utcnow().isoformat()
+            "data": data,
+            "signature": signature,
+            "timestamp": datetime.utcnow().isoformat(),
         }
