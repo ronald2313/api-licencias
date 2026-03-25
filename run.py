@@ -14,14 +14,11 @@ from app.models import License, Customer, BusinessConfig, ValidationLog, Renewal
 required_env = ['SECRET_KEY', 'DATABASE_URL']
 missing = [var for var in required_env if not os.environ.get(var)]
 if missing:
-    print(f"ERROR: Faltan variables de entorno requeridas: {', '.join(missing)}")
-    print("Crea un archivo .env con estos valores")
-    exit(1)
+    raise RuntimeError(
+        f"Faltan variables de entorno requeridas: {', '.join(missing)}"
+    )
 
 app = create_app(os.environ.get('FLASK_ENV', 'development'))
-
-with app.app_context():
-    db.create_all()
 
 
 @app.shell_context_processor
@@ -44,5 +41,8 @@ def create_db():
 
 
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
+
     port = int(os.environ.get('PORT', 5001))
     app.run(host='0.0.0.0', port=port, debug=True)
