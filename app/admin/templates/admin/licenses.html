@@ -1,0 +1,136 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Licencias{% endblock %}
+
+{% block content %}<div class="card">
+    <div class="card-header">
+        <h3>📋 Gestión de Licencias</h3>
+        <a href="{{ url_for('admin.license_new') }}" class="btn btn-success">+ Nueva Licencia</a>
+    </div>
+
+    <!-- Filtros de Estado -->
+    <div style="margin-bottom: 20px;">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="{{ url_for('admin.licenses_list') }}" class="badge {% if not status %}badge-success{% else %}badge-info{% endif %}"
+                style="text-decoration: none;">
+                Todas ({{ counts.total }})
+            </a>
+            <a href="{{ url_for('admin.licenses_list', status='activa') }}" class="badge {% if status == 'activa' %}badge-success{% else %}badge-info{% endif %}"
+                style="text-decoration: none;">
+                Activas ({{ counts.activa }})
+            </a>
+            <a href="{{ url_for('admin.licenses_list', status='vencida') }}" class="badge {% if status == 'vencida' %}badge-danger{% else %}badge-info{% endif %}"
+                style="text-decoration: none;">
+                Vencidas ({{ counts.vencida }})
+            </a>
+            <a href="{{ url_for('admin.licenses_list', status='suspendida') }}" class="badge {% if status == 'suspendida' %}badge-danger{% else %}badge-info{% endif %}"
+                style="text-decoration: none;">
+                Suspendidas ({{ counts.suspendida }})
+            </a>
+            <a href="{{ url_for('admin.licenses_list', status='gracia') }}" class="badge {% if status == 'gracia' %}badge-warning{% else %}badge-info{% endif %}"
+                style="text-decoration: none;">
+                En Gracia ({{ counts.gracia }})
+            </a>
+            <a href="{{ url_for('admin.licenses_list', status='por_vencer') }}" class="badge {% if status == 'por_vencer' %}badge-warning{% else %}badge-info{% endif %}"
+                style="text-decoration: none;">
+                Por Vencer ({{ counts.por_vencer }})
+            </a>
+        </div>
+    </div>
+
+    <!-- Búsqueda -->
+    <form class="search-bar" method="GET">
+        <input type="text" name="search" placeholder="Buscar por clave, cliente o email..." value="{{ search }}">
+        <input type="hidden" name="status" value="{{ status }}">
+        <button type="submit" class="btn">Buscar</button>
+        {% if search %}
+            <a href="{{ url_for('admin.licenses_list', status=status) }}" class="btn btn-warning">Limpiar</a>
+        {% endif %}
+    </form>
+
+    <!-- Tabla -->
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Clave de Licencia</th>
+                    <th>Cliente</th>
+                    <th>Expiración</th>
+                    <th>Estado</th>
+                    <th>Días</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lic in licenses %}
+                <tr>
+                    <td>{{ lic.id }}</td>
+                    <td><code>{{ lic.license_key }}</code></td>
+                    <td>{{ lic.customer.nombre }}</td>
+                    <td>{{ lic.fecha_expiracion.strftime('%d/%m/%Y') }}</td>
+                    <td>
+                        {% if lic.estado == 'activa' %}
+                            <span class="badge badge-success">Activa</span>
+                        {% elif lic.estado == 'vencida' %}
+                            <span class="badge badge-danger">Vencida</span>
+                        {% elif lic.estado == 'suspendida' %}
+                            <span class="badge badge-danger">Suspendida</span>
+                        {% elif lic.estado == 'gracia' %}
+                            <span class="badge badge-warning">En Gracia</span>
+                        {% elif lic.estado == 'por_vencer' %}
+                            <span class="badge badge-warning">Por Vencer</span>
+                        {% else %}
+                            <span class="badge badge-info">{{ lic.estado }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if lic.dias_restantes > 0 %}
+                            {{ lic.dias_restantes }}
+                        {% elif lic.is_in_grace_period %}
+                            <span class="badge badge-warning">{{ lic.grace_hours_remaining }}h</span>
+                        {% else %}
+                            <span class="badge badge-danger">Vencida</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('admin.license_detail', license_id=lic.id) }}" class="btn btn-small">Ver</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 40px; color: #666;">
+                        No se encontraron licencias
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Paginación -->
+    {% if pagination.pages > 1 %}
+    <div class="pagination">
+        {% if pagination.has_prev %}
+            <a href="{{ url_for('admin.licenses_list', page=pagination.prev_num, search=search, status=status) }}">← Anterior</a>
+        {% endif %}
+
+        {% for page_num in pagination.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2) %}
+            {% if page_num %}
+                {% if page_num != pagination.page %}
+                    <a href="{{ url_for('admin.licenses_list', page=page_num, search=search, status=status) }}">{{ page_num }}</a>
+                {% else %}
+                    <span class="current">{{ page_num }}</span>
+                {% endif %}
+            {% else %}
+                <span>...</span>
+            {% endif %}
+        {% endfor %}
+
+        {% if pagination.has_next %}
+            <a href="{{ url_for('admin.licenses_list', page=pagination.next_num, search=search, status=status) }}">Siguiente →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

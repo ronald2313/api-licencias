@@ -1,0 +1,80 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Historial de Renovaciones{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>🔄 Historial de Renovaciones</h3>
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-small">← Dashboard</a>
+    </div>
+
+    {% if renewals %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Licencia</th>
+                        <th>Cliente</th>
+                        <th>Período</th>
+                        <th>Nueva Expiración</th>
+                        <th>Monto</th>
+                        <th>Estado</th>
+                        <th>Notas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ren in renewals %}
+                    <tr>
+                        <td>{{ ren.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td>
+                            <a href="{{ url_for('admin.license_detail', license_id=ren.license_id) }}">
+                                {{ ren.license.license_key[:20] }}...
+                            </a>
+                        </td>
+                        <td>{{ ren.license.customer.nombre }}</td>
+                        <td>{{ ren.periodo_meses }} meses</td>
+                        <td>{{ ren.nueva_fecha_expiracion.strftime('%d/%m/%Y') }}</td>
+                        <td>${{ ren.monto or 'N/A' }}</td>
+                        <td>
+                            <span class="badge badge-success">{{ ren.estado }}</span>
+                        </td>
+                        <td>{{ ren.notas[:50] if ren.notas else 'N/A' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Paginación -->
+        {% if pagination.pages > 1 %}
+        <div class="pagination">
+            {% if pagination.has_prev %}
+                <a href="{{ url_for('admin.history_renewals', page=pagination.prev_num) }}">← Anterior</a>
+            {% endif %}
+
+            {% for page_num in pagination.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2) %}
+                {% if page_num %}
+                    {% if page_num != pagination.page %}
+                        <a href="{{ url_for('admin.history_renewals', page=page_num) }}">{{ page_num }}</a>
+                    {% else %}
+                        <span class="current">{{ page_num }}</span>
+                    {% endif %}
+                {% else %}
+                    <span>...</span>
+                {% endif %}
+            {% endfor %}
+
+            {% if pagination.has_next %}
+                <a href="{{ url_for('admin.history_renewals', page=pagination.next_num) }}">Siguiente →</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    {% else %}
+        <p style="color: #666; padding: 40px; text-align: center;">
+            No hay registros de renovaciones
+        </p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Configuración del Negocio{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>✏️ Editar Configuración del Negocio</h3>
+        <a href="{{ url_for('admin.customer_detail', customer_id=customer.id) }}" class="btn btn-small">← Volver</a>
+    </div>
+
+    <p style="margin-bottom: 20px; color: #666;">
+        <strong>Cliente:</strong> {{ customer.nombre }} ({{ customer.email }})
+    </p>
+
+    <form method="POST">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="nombre_negocio">Nombre del Negocio *</label>
+                <input type="text" id="nombre_negocio" name="nombre_negocio" required
+                       value="{{ config.nombre_negocio if config else '' }}"
+                       placeholder="Mi Negocio">
+            </div>
+
+            <div class="form-group">
+                <label for="telefono">Teléfono</label>
+                <input type="text" id="telefono" name="telefono"
+                       value="{{ config.telefono if config else '' }}"
+                       placeholder="809-555-0000">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="direccion">Dirección</label>
+                <input type="text" id="direccion" name="direccion"
+                       value="{{ config.direccion if config else '' }}"
+                       placeholder="Calle Principal #123">
+            </div>
+
+            <div class="form-group">
+                <label for="rnc_cedula">RNC/Cédula</label>
+                <input type="text" id="rnc_cedula" name="rnc_cedula"
+                       value="{{ config.rnc_cedula if config else '' }}"
+                       placeholder="001-1234567-8">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="email">Email del Negocio</label>
+                <input type="email" id="email" name="email"
+                       value="{{ config.email if config else '' }}"
+                       placeholder="negocio@email.com">
+            </div>
+
+            <div class="form-group">
+                <label for="logo_url">URL del Logo</label>
+                <input type="url" id="logo_url" name="logo_url"
+                       value="{{ config.logo_url if config else '' }}"
+                       placeholder="https://ejemplo.com/logo.png">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="mensaje_factura">Mensaje de Factura</label>
+            <textarea id="mensaje_factura" name="mensaje_factura" rows="3"
+                      placeholder="Gracias por su preferencia">{{ config.mensaje_factura if config else '' }}</textarea>
+        </div>
+
+        <div style="margin-top: 30px;">
+            <button type="submit" class="btn btn-success">Guardar Cambios</button>
+            <a href="{{ url_for('admin.customer_detail', customer_id=customer.id) }}" class="btn" style="margin-left: 10px;">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+<div class="card" style="margin-top: 20px;">
+    <h4>ℹ️ Información</h4>
+    <ul style="margin-left: 20px; color: #666;">
+        <li>Esta configuración se sincroniza automáticamente con el sistema local del cliente</li>
+        <li>Los cambios se reflejan en las facturas generadas por el sistema local</li>
+        <li>El mensaje de factura aparece al final de cada factura impresa</li>
+        <li>El RNC/Cédula se usa para identificación fiscal en facturas</li>
+    </ul>
+</div>
+{% endblock %}

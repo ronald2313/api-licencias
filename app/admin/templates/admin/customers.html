@@ -1,0 +1,82 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Clientes{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>👥 Gestión de Clientes</h3>
+        <a href="{{ url_for('admin.customer_new') }}" class="btn btn-success">+ Nuevo Cliente</a>
+    </div>
+
+    <!-- Búsqueda -->
+    <form class="search-bar" method="GET">
+        <input type="text" name="search" placeholder="Buscar por nombre o email..." value="{{ search }}">
+        <button type="submit" class="btn">Buscar</button>
+        {% if search %}
+            <a href="{{ url_for('admin.customers_list') }}" class="btn btn-warning">Limpiar</a>
+        {% endif %}
+    </form>
+
+    <!-- Tabla -->
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>Email</th>
+                    <th>Teléfono</th>
+                    <th>Licencias</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for customer in customers %}
+                <tr>
+                    <td>{{ customer.id }}</td>
+                    <td>{{ customer.nombre }}</td>
+                    <td>{{ customer.email }}</td>
+                    <td>{{ customer.telefono or 'N/A' }}</td>
+                    <td>{{ customer.licenses|length }}</td>
+                    <td>
+                        <a href="{{ url_for('admin.customer_detail', customer_id=customer.id) }}" class="btn btn-small">Ver</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 40px; color: #666;">
+                        No se encontraron clientes
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Paginación -->
+    {% if pagination.pages > 1 %}
+    <div class="pagination">
+        {% if pagination.has_prev %}
+            <a href="{{ url_for('admin.customers_list', page=pagination.prev_num, search=search) }}">← Anterior</a>
+        {% endif %}
+
+        {% for page_num in pagination.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2) %}
+            {% if page_num %}
+                {% if page_num != pagination.page %}
+                    <a href="{{ url_for('admin.customers_list', page=page_num, search=search) }}">{{ page_num }}</a>
+                {% else %}
+                    <span class="current">{{ page_num }}</span>
+                {% endif %}
+            {% else %}
+                <span>...</span>
+            {% endif %}
+        {% endfor %}
+
+        {% if pagination.has_next %}
+            <a href="{{ url_for('admin.customers_list', page=pagination.next_num, search=search) }}">Siguiente →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

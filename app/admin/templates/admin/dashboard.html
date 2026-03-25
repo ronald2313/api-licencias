@@ -1,0 +1,170 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h2 style="margin-bottom: 30px;">Dashboard</h2>
+
+<!-- Estadísticas de Licencias -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <h4>Total Licencias</h4>
+        <div class="stat-value">{{ total_licenses }}</div>
+    </div>
+    <div class="stat-card">
+        <h4>Licencias Activas</h4>
+        <div class="stat-value success">{{ active_licenses }}</div>
+    </div>
+    <div class="stat-card">
+        <h4>Por Vencer (≤3 días)</h4>
+        <div class="stat-value warning">{{ grace_licenses + counts['por_vencer'] }}</div>
+    </div>
+    <div class="stat-card">
+        <h4>Vencidas</h4>
+        <div class="stat-value danger">{{ expired_licenses }}</div>
+    </div>
+    <div class="stat-card">
+        <h4>Suspendidas</h4>
+        <div class="stat-value">{{ suspended_licenses }}</div>
+    </div>
+    <div class="stat-card">
+        <h4>Total Clientes</h4>
+        <div class="stat-value">{{ total_customers }}</div>
+    </div>
+</div>
+
+<!-- Actividad Reciente -->
+<div class="card">
+    <div class="card-header">
+        <h3>📊 Actividad Reciente (24h)</h3>
+    </div>
+    <div class="stats-grid" style="margin: 0;">
+        <div class="stat-card">
+            <h4>Validaciones</h4>
+            <div class="stat-value">{{ recent_validations }}</div>
+        </div>
+        <div class="stat-card">
+            <h4>Renovaciones</h4>
+            <div class="stat-value">{{ recent_renewals }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Licencias por Vencer -->
+<div class="card">
+    <div class="card-header">
+        <h3>⚠️ Licencias por Vencer (Próximos 7 días)</h3>
+        <a href="{{ url_for('admin.licenses_list') }}" class="btn btn-small">Ver Todas</a>
+    </div>
+    {% if expiring_soon %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Clave</th>
+                        <th>Cliente</th>
+                        <th>Expiración</th>
+                        <th>Días Restantes</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for lic in expiring_soon %}
+                    <tr>
+                        <td><code>{{ lic.license_key }}</code></td>
+                        <td>{{ lic.customer.nombre }}</td>
+                        <td>{{ lic.fecha_expiracion.strftime('%d/%m/%Y') }}</td>
+                        <td>
+                            {% if lic.dias_restantes <= 0 %}
+                                <span class="badge badge-danger">Vencida</span>
+                            {% elif lic.dias_restantes <= 3 %}
+                                <span class="badge badge-warning">{{ lic.dias_restantes }} días</span>
+                            {% else %}
+                                <span class="badge badge-info">{{ lic.dias_restantes }} días</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('admin.license_detail', license_id=lic.id) }}" class="btn btn-small">Ver</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p style="color: #666; padding: 20px;">No hay licencias por vencer en los próximos 7 días. ✅</p>
+    {% endif %}
+</div>
+
+<!-- Historial Reciente -->
+<div class="detail-grid">
+    <div class="card">
+        <div class="card-header">
+            <h3>📝 Validaciones Recientes</h3>
+        </div>
+        {% if recent_validation_logs %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Licencia</th>
+                        <th>Resultado</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in recent_validation_logs %}
+                    <tr>
+                        <td>{{ log.license.license_key[:15] }}...</td>
+                        <td>
+                            {% if log.resultado == 'exito' %}
+                                <span class="badge badge-success">Éxito</span>
+                            {% elif log.resultado == 'grace' %}
+                                <span class="badge badge-warning">Gracia</span>
+                            {% else %}
+                                <span class="badge badge-danger">{{ log.resultado }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.fecha.strftime('%d/%m %H:%M') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p style="color: #666; padding: 20px;">No hay validaciones recientes</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>🔄 Renovaciones Recientes</h3>
+        </div>
+        {% if recent_renewal_logs %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Licencia</th>
+                        <th>Período</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ren in recent_renewal_logs %}
+                    <tr>
+                        <td>{{ ren.license.license_key[:15] }}...</td>
+                        <td>{{ ren.periodo_meses }} meses</td>
+                        <td>{{ ren.created_at.strftime('%d/%m %H:%M') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p style="color: #666; padding: 20px;">No hay renovaciones recientes</p>
+        {% endif %}
+    </div>
+</div>
+
+<div style="margin-top: 30px; text-align: center;">
+    <a href="{{ url_for('admin.licenses_list') }}" class="btn">Gestionar Licencias</a>
+    <a href="{{ url_for('admin.customers_list') }}" class="btn" style="margin-left: 10px;">Gestionar Clientes</a>
+</div>
+{% endblock %}

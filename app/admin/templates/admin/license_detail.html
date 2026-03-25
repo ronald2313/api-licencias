@@ -1,0 +1,243 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Licencia {{ license.license_key }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>📄 Detalle de Licencia</h3>
+        <div>
+            <a href="{{ url_for('admin.licenses_list') }}" class="btn btn-small">← Volver</a>
+            {% if license.estado == 'suspendida' %}
+                <form method="POST" action="{{ url_for('admin.license_suspend', license_id=license.id) }}" style="display: inline;">
+                    <input type="hidden" name="action" value="reactivate">
+                    <button type="submit" class="btn btn-success btn-small" onclick="return confirm('¿Reactivar esta licencia?')">Reactivar</button>
+                </form>
+            {% else %}
+                <button type="button" class="btn btn-danger btn-small" onclick="document.getElementById('suspend-modal').style.display='block'">Suspender</button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="detail-grid">
+        <div class="detail-item">
+            <label>ID</label>
+            <p>{{ license.id }}</p>
+        </div>
+        <div class="detail-item">
+            <label>Clave de Licencia</label>
+            <p><code>{{ license.license_key }}</code></p>
+        </div>
+        <div class="detail-item">
+            <label>Estado</label>
+            <p>
+                {% if license.estado == 'activa' %}
+                    <span class="badge badge-success">Activa</span>
+                {% elif license.estado == 'vencida' %}
+                    <span class="badge badge-danger">Vencida</span>
+                {% elif license.estado == 'suspendida' %}
+                    <span class="badge badge-danger">Suspendida</span>
+                {% elif license.estado == 'gracia' %}
+                    <span class="badge badge-warning">En Gracia</span>
+                {% else %}
+                    <span class="badge badge-info">{{ license.estado }}</span>
+                {% endif %}
+            </p>
+        </div>
+        <div class="detail-item">
+            <label>Cliente</label>
+            <p><a href="{{ url_for('admin.customer_detail', customer_id=license.customer_id) }}">{{ license.customer.nombre }}</a></p>
+        </div>
+        <div class="detail-item">
+            <label>Email del Cliente</label>
+            <p>{{ license.customer.email }}</p>
+        </div>
+        <div class="detail-item">
+            <label>Teléfono</label>
+            <p>{{ license.customer.telefono or 'N/A' }}</p>
+        </div>
+        <div class="detail-item">
+            <label>Fecha de Inicio</label>
+            <p>{{ license.fecha_inicio.strftime('%d/%m/%Y %H:%M') }}</p>
+        </div>
+        <div class="detail-item">
+            <label>Fecha de Expiración</label>
+            <p>{{ license.fecha_expiracion.strftime('%d/%m/%Y %H:%M') }}</p>
+        </div>
+        <div class="detail-item">
+            <label>Días Restantes</label>
+            <p>
+                {% if license.dias_restantes > 0 %}
+                    <span class="badge badge-success">{{ license.dias_restantes }} días</span>
+                {% elif license.is_in_grace_period %}
+                    <span class="badge badge-warning">{{ license.grace_hours_remaining }} horas de gracia</span>
+                {% else %}
+                    <span class="badge badge-danger">Vencida</span>
+                {% endif %}
+            </p>
+        </div>
+        <div class="detail-item">
+            <label>Activaciones</label>
+            <p>{{ license.activation_count }}</p>
+        </div>
+        <div class="detail-item">
+            <label>Período de Gracia</label>
+            <p>
+                {% if license.grace_used %}
+                    Usado ({{ license.grace_hours_allowed }} horas permitidas)
+                {% else %}
+                    No usado ({{ license.grace_hours_allowed }} horas disponibles)
+                {% endif %}
+            </p>
+        </div>
+        {% if license.revoked_at %}
+        <div class="detail-item" style="background: #fed7d7;">
+            <label>Suspendida el</label>
+            <p>{{ license.revoked_at.strftime('%d/%m/%Y %H:%M') }}</p>
+        </div>
+        <div class="detail-item" style="background: #fed7d7;">
+            <label>Motivo de Suspensión</label>
+            <p>{{ license.revoked_reason or 'Sin especificar' }}</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Renovación -->
+<div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+        <h3>🔄 Renovar Licencia</h3>
+    </div>
+    <form method="POST" action="{{ url_for('admin.license_renew', license_id=license.id) }}" class="form-row">
+        <div class="form-group">
+            <label>Período de Renovación</label>
+            <select name="periodo_meses">
+                <option value="1">1 mes</option>
+                <option value="3">3 meses</option>
+                <option value="6">6 meses</option>
+                <option value="12" selected>12 meses</option>
+                <option value="24">24 meses</option>
+            </select>
+        </div>
+        <div class="form-group" style="display: flex; align-items: flex-end;">
+            <button type="submit" class="btn btn-success" onclick="return confirm('¿Confirmar renovación?')">Renovar Ahora</button>
+        </div>
+    </form>
+</div>
+
+<!-- Tabs para Historial -->
+<div class="card" style="margin-top: 20px;">
+    <div class="tabs">
+        <a href="#validations" class="tab active" onclick="showTab('validations', this); return false;">📝 Validaciones</a>
+        <a href="#renewals" class="tab" onclick="showTab('renewals', this); return false;">🔄 Renovaciones</a>
+    </div>
+
+    <!-- Validaciones -->
+    <div id="validations" class="tab-content">
+        {% if validation_history %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Hardware ID</th>
+                            <th>IP Cliente</th>
+                            <th>Resultado</th>
+                            <th>Mensaje</th>
+                            <th>Versión</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in validation_history %}
+                        <tr>
+                            <td>{{ log.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td><code>{{ log.hardware_id[:16] if log.hardware_id else 'N/A' }}...</code></td>
+                            <td>{{ log.ip_cliente or 'N/A' }}</td>
+                            <td>
+                                {% if log.resultado == 'exito' %}
+                                    <span class="badge badge-success">Éxito</span>
+                                {% elif log.resultado == 'grace' %}
+                                    <span class="badge badge-warning">Gracia</span>
+                                {% else %}
+                                    <span class="badge badge-danger">{{ log.resultado }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ log.mensaje[:50] if log.mensaje else 'N/A' }}</td>
+                            <td>{{ log.version_cliente or 'N/A' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p style="color: #666;">No hay historial de validaciones</p>
+        {% endif %}
+    </div>
+
+    <!-- Renovaciones -->
+    <div id="renewals" class="tab-content" style="display: none;">
+        {% if renewal_history %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Período</th>
+                            <th>Nueva Expiración</th>
+                            <th>Monto</th>
+                            <th>Estado</th>
+                            <th>Notas</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ren in renewal_history %}
+                        <tr>
+                            <td>{{ ren.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>{{ ren.periodo_meses }} meses</td>
+                            <td>{{ ren.nueva_fecha_expiracion.strftime('%d/%m/%Y') }}</td>
+                            <td>${{ ren.monto or 'N/A' }}</td>
+                            <td>
+                                <span class="badge badge-success">{{ ren.estado }}</span>
+                            </td>
+                            <td>{{ ren.notas or 'N/A' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p style="color: #666;">No hay historial de renovaciones</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal de Suspensión -->
+<div id="suspend-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="background: white; max-width: 500px; margin: 100px auto; padding: 30px; border-radius: 8px;">
+        <h3>⚠️ Suspender Licencia</h3>
+        <form method="POST" action="{{ url_for('admin.license_suspend', license_id=license.id) }}">
+            <input type="hidden" name="action" value="suspend">
+            <div class="form-group">
+                <label>Motivo de la suspensión:</label>
+                <textarea name="reason" placeholder="Indique el motivo..." rows="3"></textarea>
+            </div>
+            <div style="margin-top: 20px;">
+                <button type="submit" class="btn btn-danger" onclick="return confirm('¿Está seguro de suspender esta licencia?')">Sí, Suspender</button>
+                <button type="button" class="btn" onclick="document.getElementById('suspend-modal').style.display='none'" style="margin-left: 10px;">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function showTab(tabName, element) {
+    // Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+
+    // Show selected tab
+    document.getElementById(tabName).style.display = 'block';
+    element.classList.add('active');
+}
+</script>
+{% endblock %}

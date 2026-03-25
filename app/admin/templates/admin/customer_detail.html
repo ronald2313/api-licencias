@@ -1,0 +1,142 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}{{ customer.nombre }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>👤 Detalle del Cliente</h3>
+        <a href="{{ url_for('admin.customers_list') }}" class="btn btn-small">← Volver</a>
+    </div>
+
+    <div class="detail-grid">
+        <div class="detail-item">
+            <label>ID</label>
+            <p>{{ customer.id }}</p>
+        </div>
+        <div class="detail-item">
+            <label>Nombre</label>
+            <p>{{ customer.nombre }}</p>
+        </div>
+        <div class="detail-item">
+            <label>Email</label>
+            <p>{{ customer.email }}</p>
+        </div>
+        <div class="detail-item">
+            <label>Teléfono</label>
+            <p>{{ customer.telefono or 'N/A' }}</p>
+        </div>
+        <div class="detail-item" style="grid-column: span 2;">
+            <label>Dirección</label>
+            <p>{{ customer.direccion or 'N/A' }}</p>
+        </div>
+    </div>
+
+    <div style="margin-top: 20px;">
+        <a href="{{ url_for('admin.business_config_edit', customer_id=customer.id) }}" class="btn">✏️ Editar Configuración del Negocio</a>
+    </div>
+</div>
+
+<!-- Licencias del Cliente -->
+<div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+        <h3>📋 Licencias del Cliente</h3>
+        <a href="{{ url_for('admin.license_new') }}" class="btn btn-success btn-small">+ Nueva Licencia</a>
+    </div>
+
+    {% if licenses %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Clave</th>
+                        <th>Estado</th>
+                        <th>Expiración</th>
+                        <th>Días Restantes</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for lic in licenses %}
+                    <tr>
+                        <td><code>{{ lic.license_key }}</code></td>
+                        <td>
+                            {% if lic.estado == 'activa' %}
+                                <span class="badge badge-success">Activa</span>
+                            {% elif lic.estado == 'vencida' %}
+                                <span class="badge badge-danger">Vencida</span>
+                            {% elif lic.estado == 'suspendida' %}
+                                <span class="badge badge-danger">Suspendida</span>
+                            {% else %}
+                                <span class="badge badge-info">{{ lic.estado }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ lic.fecha_expiracion.strftime('%d/%m/%Y') }}</td>
+                        <td>
+                            {% if lic.dias_restantes > 0 %}
+                                {{ lic.dias_restantes }}
+                            {% else %}
+                                <span class="badge badge-danger">Vencida</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('admin.license_detail', license_id=lic.id) }}" class="btn btn-small">Ver</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p style="color: #666; padding: 20px;">Este cliente no tiene licencias aún.</p>
+    {% endif %}
+</div>
+
+<!-- Configuración del Negocio -->
+<div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+        <h3>🏪 Configuración del Negocio</h3>
+    </div>
+
+    {% if config %}
+        <div class="detail-grid">
+            <div class="detail-item">
+                <label>Nombre del Negocio</label>
+                <p>{{ config.nombre_negocio }}</p>
+            </div>
+            <div class="detail-item">
+                <label>Teléfono</label>
+                <p>{{ config.telefono or 'N/A' }}</p>
+            </div>
+            <div class="detail-item">
+                <label>Dirección</label>
+                <p>{{ config.direccion or 'N/A' }}</p>
+            </div>
+            <div class="detail-item">
+                <label>RNC/Cédula</label>
+                <p>{{ config.rnc_cedula or 'N/A' }}</p>
+            </div>
+            <div class="detail-item">
+                <label>Email</label>
+                <p>{{ config.email or 'N/A' }}</p>
+            </div>
+            <div class="detail-item" style="grid-column: span 2;">
+                <label>Mensaje de Factura</label>
+                <p>{{ config.mensaje_factura or 'N/A' }}</p>
+            </div>
+            {% if config.logo_url %}
+            <div class="detail-item" style="grid-column: span 2;">
+                <label>Logo URL</label>
+                <p><a href="{{ config.logo_url }}" target="_blank">{{ config.logo_url }}</a></p>
+            </div>
+            {% endif %}
+        </div>
+
+        <div style="margin-top: 20px;">
+            <a href="{{ url_for('admin.business_config_edit', customer_id=customer.id) }}" class="btn">✏️ Editar Configuración</a>
+        </div>
+    {% else %}
+        <p style="color: #666; padding: 20px;">No hay configuración del negocio. <a href="{{ url_for('admin.business_config_edit', customer_id=customer.id) }}">Crear configuración</a></p>
+    {% endif %}
+</div>
+{% endblock %}

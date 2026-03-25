@@ -1,0 +1,57 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Nuevo Cliente{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>➕ Crear Nuevo Cliente</h3>
+        <a href="{{ url_for('admin.customers_list') }}" class="btn btn-small">← Volver</a>
+    </div>
+
+    <form method="POST">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="nombre">Nombre del Cliente *</label>
+                <input type="text" id="nombre" name="nombre" required
+                       placeholder="Nombre completo o nombre del negocio">
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email *</label>
+                <input type="email" id="email" name="email" required
+                       placeholder="cliente@email.com">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="telefono">Teléfono</label>
+                <input type="text" id="telefono" name="telefono"
+                       placeholder="809-555-0000">
+            </div>
+
+            <div class="form-group">
+                <label for="direccion">Dirección</label>
+                <input type="text" id="direccion" name="direccion"
+                       placeholder="Calle Principal #123">
+            </div>
+        </div>
+
+        <div style="margin-top: 30px;">
+            <button type="submit" class="btn btn-success">Crear Cliente</button>
+            <a href="{{ url_for('admin.customers_list') }}" class="btn" style="margin-left: 10px;">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+<div class="card" style="margin-top: 20px;">
+    <h4>ℹ️ Información</h4>
+    <ul style="margin-left: 20px; color: #666;">
+        <li>Al crear un cliente, se generará automáticamente la configuración del negocio</li>
+        <li>El email debe ser único (no se pueden duplicar)</li>
+        <li>Después de crear el cliente, podrá agregarle licencias</li>
+        <li>Los datos del cliente se sincronizan con el sistema local del cliente</li>
+    </ul>
+</div>
+{% endblock %}

@@ -34,6 +34,10 @@ def create_app(config_name='default'):
     app.register_blueprint(licenses_bp, url_prefix='/api/v1')
     app.register_blueprint(config_bp, url_prefix='/api/v1')
 
+    # Registrar blueprint de admin (separado de la API)
+    from app.admin import admin_bp
+    app.register_blueprint(admin_bp)
+
     # Health check
     @app.route('/health')
     def health_check():

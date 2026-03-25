@@ -1,5 +1,7 @@
 from flask import Blueprint, request, jsonify
-from app.models import License, BusinessConfig
+from sqlalchemy.exc import SQLAlchemyError
+from app import db
+from app.models import License, BusinessConfig, Customer
 
 config_bp = Blueprint('config', __name__)
 
@@ -10,47 +12,105 @@ def get_business_config():
     Obtener la configuración del negocio asociada a una licencia.
     El license_key se puede pasar como header Authorization o query param.
     """
-    # Intentar obtener de header primero
-    auth_header = request.headers.get('Authorization', '')
-    license_key = None
+    try:
+        # Intentar obtener de header primero
+        auth_header = request.headers.get('Authorization', '')
+        license_key = None
 
-    if auth_header.startswith('Bearer '):
-        license_key = auth_header[7:]
-    else:
-        # Intentar de query param
-        license_key = request.args.get('license_key')
+        if auth_header.startswith('Bearer '):
+            license_key = auth_header[7:].strip()
+        else:
+            # Intentar de query param
+            license_key = request.args.get('license_key')
 
-    if not license_key:
-        return jsonify({'error': 'license_key requerido (header Authorization o query param)'}), 401
+        if not license_key:
+            return jsonify({
+                'success': False,
+                'error': 'license_key requerido (header Authorization: Bearer <key> o query param)'
+            }), 401
 
-    # Buscar licencia
-    license = License.query.filter_by(license_key=license_key).first()
+        # Buscar licencia con manejo de errores de base de datos
+        try:
+            license_obj = License.query.filter_by(license_key=license_key).first()
+        except SQLAlchemyError as e:
+            return jsonify({
+                'success': False,
+                'error': 'Error de base de datos al buscar licencia',
+                'detail': str(e)
+            }), 500
 
-    if not license:
-        return jsonify({'error': 'Licencia no encontrada'}), 404
+        if not license_obj:
+            return jsonify({
+                'success': False,
+                'error': 'Licencia no encontrada',
+                'code': 'LICENSE_NOT_FOUND'
+            }), 404
 
-    # Verificar que la licencia esté activa (o en gracia)
-    if license.estado not in ['activa', 'por_vencer'] and license.estado != 'vencida':
-        return jsonify({'error': 'Licencia no activa'}), 403
+        # Verificar que la licencia esté activa o por vencer
+        if license_obj.estado not in ['activa', 'por_vencer']:
+            return jsonify({
+                'success': False,
+                'error': 'Licencia no activa',
+                'code': 'LICENSE_INACTIVE',
+                'estado': license_obj.estado,
+                'dias_restantes': license_obj.dias_restantes
+            }), 403
 
-    # Obtener configuración del negocio
-    config = BusinessConfig.query.filter_by(customer_id=license.customer_id).first()
+        # Obtener el cliente asociado de forma segura
+        customer = license_obj.customer
 
-    if not config:
-        # Si no existe, devolver valores por defecto basados en el cliente
-        customer = license.customer
+        if not customer:
+            return jsonify({
+                'success': False,
+                'error': 'Cliente asociado a la licencia no encontrado',
+                'code': 'CUSTOMER_NOT_FOUND'
+            }), 404
+
+        # Obtener configuración del negocio de forma segura
+        try:
+            config = BusinessConfig.query.filter_by(customer_id=license_obj.customer_id).first()
+        except SQLAlchemyError as e:
+            return jsonify({
+                'success': False,
+                'error': 'Error de base de datos al buscar configuración',
+                'detail': str(e)
+            }), 500
+
+        if not config:
+            # Si no existe configuración, devolver valores por defecto basados en el cliente
+            response_data = {
+                'success': True,
+                'data': {
+                    'nombre_negocio': customer.nombre or 'Mi Negocio',
+                    'telefono': customer.telefono or '',
+                    'direccion': customer.direccion or '',
+                    'rnc_cedula': '',
+                    'email': customer.email or '',
+                    'logo_url': None,
+                    'mensaje_factura': 'Gracias por su preferencia',
+                    'updated_at': None
+                },
+                'source': 'default_from_customer'
+            }
+            return jsonify(response_data), 200
+
+        # Configuración existe - devolverla
         return jsonify({
-            'nombre_negocio': customer.nombre if customer else 'Mi Negocio',
-            'telefono': customer.telefono if customer else '',
-            'direccion': customer.direccion if customer else '',
-            'rnc_cedula': '',
-            'email': customer.email if customer else '',
-            'logo_url': None,
-            'mensaje_factura': 'Gracias por su preferencia',
-            'updated_at': None
+            'success': True,
+            'data': config.to_dict(),
+            'source': 'database'
         }), 200
 
-    return jsonify(config.to_dict()), 200
+    except Exception as e:
+        # Captura cualquier error inesperado
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': 'Error interno del servidor',
+            'code': 'INTERNAL_ERROR',
+            'detail': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
 
 
 # ============================================
@@ -61,100 +121,207 @@ def get_business_config():
 @config_bp.route('/licenses', methods=['GET'])
 def list_licenses():
     """Listar todas las licencias (para panel admin)"""
-    licenses = License.query.all()
-    return jsonify([lic.to_dict(include_customer=True) for lic in licenses]), 200
+    try:
+        licenses = License.query.all()
+        return jsonify({
+            'success': True,
+            'data': [lic.to_dict(include_customer=True) for lic in licenses]
+        }), 200
+    except SQLAlchemyError as e:
+        return jsonify({
+            'success': False,
+            'error': 'Error de base de datos',
+            'detail': str(e)
+        }), 500
 
 
 @config_bp.route('/licenses/<int:license_id>', methods=['GET'])
 def get_license(license_id):
     """Obtener detalle de una licencia"""
-    license = License.query.get_or_404(license_id)
-    return jsonify(license.to_dict(include_customer=True)), 200
+    try:
+        license_obj = License.query.get(license_id)
+        if not license_obj:
+            return jsonify({
+                'success': False,
+                'error': 'Licencia no encontrada'
+            }), 404
+        return jsonify({
+            'success': True,
+            'data': license_obj.to_dict(include_customer=True)
+        }), 200
+    except SQLAlchemyError as e:
+        return jsonify({
+            'success': False,
+            'error': 'Error de base de datos',
+            'detail': str(e)
+        }), 500
 
 
 @config_bp.route('/customers', methods=['GET'])
 def list_customers():
     """Listar todos los clientes"""
-    customers = Customer.query.all()
-    return jsonify([c.to_dict() for c in customers]), 200
+    try:
+        customers = Customer.query.all()
+        return jsonify({
+            'success': True,
+            'data': [c.to_dict() for c in customers]
+        }), 200
+    except SQLAlchemyError as e:
+        return jsonify({
+            'success': False,
+            'error': 'Error de base de datos',
+            'detail': str(e)
+        }), 500
 
 
 @config_bp.route('/customers', methods=['POST'])
 def create_customer():
     """Crear un nuevo cliente"""
-    data = request.get_json()
+    try:
+        data = request.get_json()
 
-    if not data:
-        return jsonify({'error': 'No se recibieron datos'}), 400
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'No se recibieron datos'
+            }), 400
 
-    customer = Customer(
-        nombre=data.get('nombre'),
-        email=data.get('email'),
-        telefono=data.get('telefono'),
-        direccion=data.get('direccion')
-    )
+        # Validaciones
+        nombre = data.get('nombre', '').strip()
+        email = data.get('email', '').strip()
 
-    db.session.add(customer)
-    db.session.commit()
+        if not nombre:
+            return jsonify({
+                'success': False,
+                'error': 'El nombre es requerido'
+            }), 400
 
-    return jsonify(customer.to_dict()), 201
+        if not email:
+            return jsonify({
+                'success': False,
+                'error': 'El email es requerido'
+            }), 400
+
+        # Verificar email único
+        existing = Customer.query.filter_by(email=email).first()
+        if existing:
+            return jsonify({
+                'success': False,
+                'error': 'Ya existe un cliente con ese email'
+            }), 400
+
+        customer = Customer(
+            nombre=nombre,
+            email=email,
+            telefono=data.get('telefono', ''),
+            direccion=data.get('direccion', '')
+        )
+
+        db.session.add(customer)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'data': customer.to_dict()
+        }), 201
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': 'Error de base de datos',
+            'detail': str(e)
+        }), 500
 
 
 @config_bp.route('/licenses', methods=['POST'])
 def create_license():
     """Crear una nueva licencia (para panel admin)"""
     from datetime import datetime, timedelta
-    from app.models import License, Customer
 
-    data = request.get_json()
+    try:
+        data = request.get_json()
 
-    if not data:
-        return jsonify({'error': 'No se recibieron datos'}), 400
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'No se recibieron datos'
+            }), 400
 
-    customer_id = data.get('customer_id')
-    license_key = data.get('license_key')
-    periodo_meses = data.get('periodo_meses', 12)
+        customer_id = data.get('customer_id')
+        license_key = data.get('license_key', '').strip()
+        periodo_meses = data.get('periodo_meses', 12)
 
-    if not customer_id or not license_key:
-        return jsonify({'error': 'customer_id y license_key son requeridos'}), 400
+        if not customer_id:
+            return jsonify({
+                'success': False,
+                'error': 'customer_id es requerido'
+            }), 400
 
-    # Verificar que el cliente existe
-    customer = Customer.query.get(customer_id)
-    if not customer:
-        return jsonify({'error': 'Cliente no encontrado'}), 404
+        if not license_key:
+            return jsonify({
+                'success': False,
+                'error': 'license_key es requerido'
+            }), 400
 
-    # Verificar que la licencia no exista
-    existing = License.query.filter_by(license_key=license_key).first()
-    if existing:
-        return jsonify({'error': 'License key ya existe'}), 400
+        # Verificar que el cliente existe
+        customer = Customer.query.get(customer_id)
+        if not customer:
+            return jsonify({
+                'success': False,
+                'error': 'Cliente no encontrado'
+            }), 404
 
-    # Calcular fechas
-    hoy = datetime.utcnow()
-    fecha_exp = hoy + timedelta(days=30 * periodo_meses)
+        # Verificar que la licencia no exista
+        existing = License.query.filter_by(license_key=license_key).first()
+        if existing:
+            return jsonify({
+                'success': False,
+                'error': 'License key ya existe'
+            }), 400
 
-    license = License(
-        license_key=license_key,
-        customer_id=customer_id,
-        fecha_inicio=hoy,
-        fecha_expiracion=fecha_exp,
-        estado='activa'
-    )
+        # Calcular fechas
+        hoy = datetime.utcnow()
+        fecha_exp = hoy + timedelta(days=30 * int(periodo_meses))
 
-    db.session.add(license)
+        license_obj = License(
+            license_key=license_key,
+            customer_id=customer_id,
+            fecha_inicio=hoy,
+            fecha_expiracion=fecha_exp,
+            estado='activa'
+        )
 
-    # Crear business_config por defecto
-    config = BusinessConfig(
-        customer_id=customer_id,
-        nombre_negocio=customer.nombre or 'Mi Negocio',
-        email=customer.email
-    )
-    db.session.add(config)
+        db.session.add(license_obj)
 
-    db.session.commit()
+        # Crear business_config por defecto (solo si no existe)
+        existing_config = BusinessConfig.query.filter_by(customer_id=customer_id).first()
+        if not existing_config:
+            config = BusinessConfig(
+                customer_id=customer_id,
+                nombre_negocio=customer.nombre or 'Mi Negocio',
+                email=customer.email
+            )
+            db.session.add(config)
 
-    return jsonify(license.to_dict(include_customer=True)), 201
+        db.session.commit()
 
+        return jsonify({
+            'success': True,
+            'data': license_obj.to_dict(include_customer=True)
+        }), 201
 
-# Importar db aquí para evitar circular import
-from app import db
-from app.models import Customer
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': 'Error de base de datos',
+            'detail': str(e)
+        }), 500
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': 'Error interno',
+            'detail': str(e)
+        }), 500

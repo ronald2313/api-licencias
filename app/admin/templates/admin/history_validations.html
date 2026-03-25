@@ -1,0 +1,95 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Historial de Validaciones{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>📝 Historial de Validaciones</h3>
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-small">← Dashboard</a>
+    </div>
+
+    {% if license_id %}
+    <div class="alert alert-info" style="margin-bottom: 20px;">
+        Mostrando validaciones para Licencia ID: {{ license_id }}
+        <a href="{{ url_for('admin.history_validations') }}">Ver todas</a>
+    </div>
+    {% endif %}
+
+    {% if logs %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha/Hora</th>
+                        <th>Licencia</th>
+                        <th>Cliente</th>
+                        <th>Hardware ID</th>
+                        <th>IP Cliente</th>
+                        <th>Resultado</th>
+                        <th>Mensaje</th>
+                        <th>Versión</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.fecha.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+                        <td>
+                            <a href="{{ url_for('admin.license_detail', license_id=log.license_id) }}">
+                                {{ log.license.license_key[:20] }}...
+                            </a>
+                        </td>
+                        <td>{{ log.license.customer.nombre }}</td>
+                        <td><code>{{ log.hardware_id[:16] if log.hardware_id else 'N/A' }}...</code></td>
+                        <td>{{ log.ip_cliente or 'N/A' }}</td>
+                        <td>
+                            {% if log.resultado == 'exito' %}
+                                <span class="badge badge-success">Éxito</span>
+                            {% elif log.resultado == 'grace' %}
+                                <span class="badge badge-warning">Gracia</span>
+                            {% elif log.resultado == 'error' %}
+                                <span class="badge badge-danger">Error</span>
+                            {% else %}
+                                <span class="badge badge-info">{{ log.resultado }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.mensaje[:50] if log.mensaje else 'N/A' }}</td>
+                        <td>{{ log.version_cliente or 'N/A' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Paginación -->
+        {% if pagination.pages > 1 %}
+        <div class="pagination">
+            {% if pagination.has_prev %}
+                <a href="{{ url_for('admin.history_validations', page=pagination.prev_num, license_id=license_id) }}">← Anterior</a>
+            {% endif %}
+
+            {% for page_num in pagination.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2) %}
+                {% if page_num %}
+                    {% if page_num != pagination.page %}
+                        <a href="{{ url_for('admin.history_validations', page=page_num, license_id=license_id) }}">{{ page_num }}</a>
+                    {% else %}
+                        <span class="current">{{ page_num }}</span>
+                    {% endif %}
+                {% else %}
+                    <span>...</span>
+                {% endif %}
+            {% endfor %}
+
+            {% if pagination.has_next %}
+                <a href="{{ url_for('admin.history_validations', page=pagination.next_num, license_id=license_id) }}">Siguiente →</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    {% else %}
+        <p style="color: #666; padding: 40px; text-align: center;">
+            No hay registros de validaciones
+        </p>
+    {% endif %}
+</div>
+{% endblock %}

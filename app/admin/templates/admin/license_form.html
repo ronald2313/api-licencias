@@ -1,0 +1,59 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Nueva Licencia{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>➕ Crear Nueva Licencia</h3>
+        <a href="{{ url_for('admin.licenses_list') }}" class="btn btn-small">← Volver</a>
+    </div>
+
+    <form method="POST">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="license_key">Clave de Licencia *</label>
+                <input type="text" id="license_key" name="license_key" required
+                       placeholder="LIC-XXXX-XXXX" style="text-transform: uppercase;">
+                <small style="color: #666;">Formato recomendado: LIC-XXXX-XXXX</small>
+            </div>
+
+            <div class="form-group">
+                <label for="customer_id">Cliente *</label>
+                <select id="customer_id" name="customer_id" required>
+                    <option value="">Seleccione un cliente...</option>
+                    {% for customer in customers %}
+                        <option value="{{ customer.id }}">{{ customer.nombre }} ({{ customer.email }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="periodo_meses">Período de Vigencia</label>
+            <select id="periodo_meses" name="periodo_meses">
+                <option value="1">1 mes</option>
+                <option value="3">3 meses</option>
+                <option value="6">6 meses</option>
+                <option value="12" selected>12 meses</option>
+                <option value="24">24 meses</option>
+            </select>
+        </div>
+
+        <div style="margin-top: 30px;">
+            <button type="submit" class="btn btn-success">Crear Licencia</button>
+            <a href="{{ url_for('admin.licenses_list') }}" class="btn" style="margin-left: 10px;">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+<div class="card" style="margin-top: 20px;">
+    <h4>ℹ️ Información</h4>
+    <ul style="margin-left: 20px; color: #666;">
+        <li>La licencia se creará en estado "activa"</li>
+        <li>Se generará automáticamente la configuración del negocio</li>
+        <li>El cliente podrá activar la licencia usando su hardware ID</li>
+        <li>La fecha de expiración se calcula desde hoy + período seleccionado</li>
+    </ul>
+</div>
+{% endblock %}
