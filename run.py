@@ -18,7 +18,7 @@ if missing:
         f"Faltan variables de entorno requeridas: {', '.join(missing)}"
     )
 
-app = create_app(os.environ.get('FLASK_ENV', 'development'))
+app = create_app()
 
 
 @app.shell_context_processor
