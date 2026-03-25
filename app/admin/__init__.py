@@ -38,4 +38,8 @@ def create_app():
     register_routes(app)
     app.register_blueprint(admin_bp)
 
+    @app.route("/api/test", methods=["GET"])
+    def test_api():
+        return {"ok": True}, 200
+
     return app
