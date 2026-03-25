@@ -97,13 +97,13 @@ class License(db.Model):
         return max(0, int(remaining))
 
     @property
-    def is_in_grace_period(self):
-        ""¿Está dentro del período de gracia válido?"""
+    def esta_en_periodo_gracia(self):
+        """¿Está dentro del período de gracia válido?"""
         if not self.grace_used or not self.grace_started_at:
             return False
         return self.grace_hours_remaining > 0
 
-    @property
+    @propert
     def esta_activa(self):
         """Verificar si la licencia está activa"""
         if self.revoked_at:
