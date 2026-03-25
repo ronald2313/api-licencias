@@ -1,11 +1,10 @@
 Flask==3.0.3
 Flask-SQLAlchemy==3.1.1
 Flask-Migrate==4.0.7
-Flask-CORS==4.0.1
-psycopg[binary]==3.2.13
+Flask-Cors==4.0.1
 python-dotenv==1.0.1
 gunicorn==22.0.0
 Werkzeug==3.0.3
-SQLAlchemy==2.0.31
-email-validator==2.1.0.post1
 requests==2.32.3
+email-validator==2.1.0.post1
+psycopg2-binary==2.9.10
