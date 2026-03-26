@@ -541,6 +541,230 @@ def revoke_license():
         }), 500
 
 
+@licenses_bp.route('/health', methods=['GET'])
+def api_health():
+    """
+    Health check para la API.
+    Endpoint público para verificar que el servicio está funcionando.
+    """
+    try:
+        # Verificar conexión a BD
+        db.session.execute('SELECT 1')
+        return jsonify({
+            'status': 'ok',
+            'service': 'license-api',
+            'database': 'connected',
+            'timestamp': datetime.utcnow().isoformat()
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'status': 'degraded',
+            'service': 'license-api',
+            'database': 'error',
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat()
+        }), 503
+
+
+@licenses_bp.route('/validate', methods=['GET'])
+def validate_license_get():
+    """
+    Validar licencia vía GET (para compatibilidad y pruebas).
+    El license_key se pasa como query param.
+    """
+    license_key = request.args.get('license_key', '').strip().upper()
+    hardware_id = request.args.get('hardware_id', '').strip()
+    version = request.args.get('version', '1.0.0')
+
+    if not license_key:
+        return jsonify({
+            'valid': False,
+            'error': 'license_key es requerido como query param',
+            'code': 'MISSING_LICENSE_KEY'
+        }), 400
+
+    # Reutilizar lógica de validación
+    return _do_validate(license_key, hardware_id, version)
+
+
+@licenses_bp.route('/validate', methods=['POST'])
+@rate_limit(max_requests=30, window=60)
+def validate_license():
+    """
+    Validar una licencia existente vía POST.
+    """
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'No se recibieron datos',
+                'code': 'NO_DATA'
+            }), 400
+
+        license_key = data.get('license_key', '').strip().upper()
+        hardware_id = data.get('hardware_id', '').strip()
+        version = data.get('version', '1.0.0')
+
+        if not license_key:
+            return jsonify({
+                'success': False,
+                'error': 'license_key es requerido',
+                'code': 'MISSING_LICENSE_KEY'
+            }), 400
+
+        return _do_validate(license_key, hardware_id, version, is_post=True)
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': 'Error de base de datos',
+            'code': 'DB_ERROR',
+            'detail': str(e)
+        }), 500
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': 'Error interno del servidor',
+            'code': 'INTERNAL_ERROR',
+            'detail': str(e)
+        }), 500
+
+
+def _do_validate(license_key, hardware_id, version, is_post=False):
+    """
+    Lógica compartida de validación para GET y POST.
+    """
+    try:
+        # Buscar licencia
+        license_obj = License.query.filter_by(license_key=license_key).first()
+
+        if not license_obj:
+            result = {
+                'valid': False,
+                'error': 'Licencia no encontrada',
+                'code': 'LICENSE_NOT_FOUND'
+            }
+            if is_post:
+                result['success'] = False
+            return jsonify(result), 404
+
+        # Verificar si está revocada
+        if license_obj.revoked_at:
+            result = {
+                'valid': False,
+                'error': 'Licencia revocada',
+                'code': 'LICENSE_REVOKED'
+            }
+            if is_post:
+                result['success'] = False
+            return jsonify(result), 403
+
+        # Verificar hardware
+        if license_obj.hardware_id_hash and not license_obj.verify_hardware_id(hardware_id):
+            result = {
+                'valid': False,
+                'error': 'Hardware no coincide con el registrado',
+                'code': 'HARDWARE_MISMATCH'
+            }
+            if is_post:
+                result['success'] = False
+            return jsonify(result), 403
+
+        # Actualizar estado basado en fecha
+        license_obj.actualizar_estado()
+        db.session.commit()
+
+        # Preparar respuesta
+        resultado = 'exito'
+        mensaje = 'Licencia válida'
+        grace_permitido = False
+        grace_remaining = 0
+
+        # Si está vencida
+        if license_obj.estado == 'vencida':
+            if not license_obj.grace_used:
+                license_obj.start_grace_period()
+                db.session.commit()
+                grace_permitido = True
+                resultado = 'grace'
+                grace_remaining = license_obj.grace_hours_remaining
+                mensaje = f'Licencia vencida. Período de gracia activado'
+            elif license_obj.is_in_grace_period:
+                grace_permitido = True
+                resultado = 'grace'
+                grace_remaining = license_obj.grace_hours_remaining
+                mensaje = f'En período de gracia'
+            else:
+                resultado = 'bloqueado'
+                mensaje = 'Licencia vencida. Período de gracia expirado'
+
+        elif license_obj.estado == 'gracia':
+            grace_permitido = True
+            grace_remaining = license_obj.grace_hours_remaining
+            mensaje = f'Licencia en período de gracia'
+
+        elif license_obj.estado == 'suspendida':
+            resultado = 'suspendida'
+            mensaje = 'Licencia suspendida'
+
+        # Registrar en logs
+        try:
+            log = ValidationLog(
+                license_id=license_obj.id,
+                hardware_id=hardware_id[:32] if hardware_id else None,
+                ip_cliente=request.remote_addr,
+                resultado=resultado,
+                mensaje=mensaje,
+                version_cliente=version
+            )
+            db.session.add(log)
+            license_obj.last_validation = datetime.utcnow()
+            db.session.commit()
+        except Exception:
+            pass  # No fallar por error en logging
+
+        # Respuesta
+        is_valid = resultado in ['exito', 'grace']
+
+        if is_post:
+            return jsonify({
+                'success': is_valid,
+                'data': {
+                    'valid': is_valid,
+                    'estado': license_obj.estado,
+                    'fecha_expiracion': license_obj.fecha_expiracion.isoformat(),
+                    'dias_restantes': license_obj.dias_restantes,
+                    'grace_permitido': grace_permitido,
+                    'grace_hours_remaining': grace_remaining,
+                    'mensaje': mensaje
+                }
+            }), 200 if is_valid else 403
+        else:
+            return jsonify({
+                'valid': is_valid,
+                'estado': license_obj.estado,
+                'fecha_expiracion': license_obj.fecha_expiracion.isoformat(),
+                'dias_restantes': license_obj.dias_restantes,
+                'mensaje': mensaje
+            }), 200 if is_valid else 403
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({
+            'valid': False,
+            'error': 'Error de base de datos',
+            'detail': str(e)
+        }), 500
+    except Exception as e:
+        return jsonify({
+            'valid': False,
+            'error': str(e)
+        }), 500
+
+
 @licenses_bp.route('/heartbeat', methods=['GET'])
 def heartbeat():
     """

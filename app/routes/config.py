@@ -26,12 +26,13 @@ def get_business_config():
         if not license_key:
             return jsonify({
                 'success': False,
-                'error': 'license_key requerido (header Authorization: Bearer <key> o query param)'
+                'error': 'license_key requerido (header Authorization: Bearer <key> o query param)',
+                'code': 'MISSING_LICENSE_KEY'
             }), 401
 
         # Buscar licencia con manejo de errores de base de datos
         try:
-            license_obj = License.query.filter_by(license_key=license_key).first()
+            license_obj = License.query.filter_by(license_key=license_key.upper()).first()
         except SQLAlchemyError as e:
             return jsonify({
                 'success': False,
@@ -47,7 +48,7 @@ def get_business_config():
             }), 404
 
         # Verificar que la licencia esté activa o por vencer
-        if license_obj.estado not in ['activa', 'por_vencer']:
+        if license_obj.estado not in ['activa', 'por_vencer', 'gracia']:
             return jsonify({
                 'success': False,
                 'error': 'Licencia no activa',
@@ -97,7 +98,16 @@ def get_business_config():
         # Configuración existe - devolverla
         return jsonify({
             'success': True,
-            'data': config.to_dict(),
+            'data': {
+                'nombre_negocio': config.nombre_negocio,
+                'telefono': config.telefono,
+                'direccion': config.direccion,
+                'rnc_cedula': config.rnc_cedula,
+                'email': config.email,
+                'logo_url': config.logo_url,
+                'mensaje_factura': config.mensaje_factura,
+                'updated_at': config.updated_at.isoformat() if config.updated_at else None
+            },
             'source': 'database'
         }), 200
 
