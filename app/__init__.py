@@ -36,11 +36,24 @@ def create_app():
     # Importar modelos después de init_app para registrar metadata
     from app.models import License, Customer, BusinessConfig, ValidationLog, Renewal  # noqa: F401
 
+    # Registrar blueprints de la API
+    from app.routes import licenses_bp, config_bp
+    app.register_blueprint(licenses_bp, url_prefix='/api/v1')
+    app.register_blueprint(config_bp, url_prefix='/api/v1')
+
+    # Registrar blueprint del panel admin
+    from app.admin import admin_bp
+    app.register_blueprint(admin_bp)
+
     @app.route("/")
     def home():
         return jsonify({
             "status": "ok",
-            "message": "API de licencias funcionando"
+            "message": "API de licencias funcionando",
+            "endpoints": {
+                "api": "/api/v1",
+                "admin": "/admin"
+            }
         }), 200
 
     @app.route("/health")
